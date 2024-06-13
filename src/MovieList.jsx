@@ -2,14 +2,19 @@ import { useState, useEffect } from "react";
 import "./MovieList.css";
 import MovieCard from "./MovieCard";
 import Modal from "./Modal";
+import Nav from "./Nav";
 
 // Purpose: Create card elements from API info
 export const MovieList = () => {
   const [data, setData] = useState([]);
-  const [page, updatePage] = useState(1);
-  const [searchText, updateSearchText] = useState("");
-  const [modalOpen, setShowModal] = useState(false);
-  const [selectedMovieInfo, updateMovieInfo] = useState(null);
+  const [page, setPage] = useState(1);
+  const [searchText, setSearchText] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [MovieInfo, setMovieInfo] = useState(null);
+  const [sortString, setSortString] = useState("");
+  const [lastAction, setLastAction] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [genre, setGenreFilter] = useState("");
 
   const options = {
     method: "GET",
@@ -19,14 +24,24 @@ export const MovieList = () => {
     },
   };
 
-  const searchMovies = () => {
-    updatePage(1);
-    setData([]);
-    fetchData();
+  const applySort = (newSortString) => {
+    setLastAction("sort");
+    setSortString(newSortString); // Update sort state
+    setPage(1); // Reset to the first page
+    setGenreFilter(""); // Clear the genre filter
+  };
+
+  const performSearch = () => {
+    if (searchText === "") {
+      return;
+    }
+    setLastAction("search");
+    setPage(1); // Reset to the first page
+    fetchData(); // Manually trigger data fetching
   };
 
   const changePage = () => {
-    updatePage(
+    setPage(
       (prevPage) => prevPage + 1,
       () => {
         fetchData();
@@ -40,102 +55,98 @@ export const MovieList = () => {
       options
     );
     const movieInfoData = await movieInfoResponse.json();
-    updateMovieInfo(movieInfoData);
+    setMovieInfo(movieInfoData);
     setShowModal((prev) => !prev);
   };
 
   const genre_convert = (ids) => {
-    if (!selectedMovieInfo || !selectedMovieInfo.genres || !ids) {
+    if (!MovieInfo || !MovieInfo.genres || !ids) {
       return "";
     }
     return ids
-      .map(
-        (id) => selectedMovieInfo.genres.find((genre) => genre.id === id)?.name
-      )
+      .map((id) => MovieInfo.genres.find((genre) => genre.id === id)?.name)
       .filter((name) => name) // filter out any undefined values
       .join(", ");
   };
 
-  const fetchData = async () => {
-    if (searchText === "") {
-      //add if dropdown menu
-      const resp = await fetch(
-        `https://api.themoviedb.org/3/movie/now_playing?language=en-US&page=${page}`,
-        options
-      );
-      const Movies = await resp.json();
-      if (page === 1) {
-        setData([...Movies.results]);
-      } else {
-        setData((prevData) => [...prevData, ...Movies.results]); //appends results to end
-      }
-    } else {
-      //option for drop down
-      const resp = await fetch(
-        `https://api.themoviedb.org/3/search/movie?query=${searchText}&include_adult=false&language=en-US&page=${page}`,
-        options
-      );
-      const Movies = await resp.json();
-      if (page === 1) {
-        setData([...Movies.results]);
-      } else {
-        setData((prevData) => [...prevData, ...Movies.results]); //appends results to end
-      }
-    }
-  };
   useEffect(() => {
     fetchData();
-  }, [page]); //adds to update for every new page
+  }, [page, sortString, lastAction, genre]); // update on change
 
+  const fetchData = async () => {
+    let baseUrl = "https://api.themoviedb.org/3";
+    let url = `${baseUrl}/movie/now_playing?language=en-US&page=${page}`;
+
+    if (genre) {
+      url = `${baseUrl}/discover/movie?include_adult=false&include_video=false&language=en-US&page=${page}&with_genres=${genre}`;
+    } else if (lastAction === "search" && searchText !== "") {
+      url = `${baseUrl}/search/movie?query=${searchText}&include_adult=false&language=en-US&page=${page}`;
+    } else if (lastAction === "sort" && sortString !== "") {
+      url = `${baseUrl}/discover/movie?include_adult=false&include_video=false&language=en-US&page=${page}&sort_by=${sortString}`;
+    }
+
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setData(page === 1 ? [...data.results] : [...data, ...data.results]); // Handle pagination
+    } catch (error) {
+      console.error("Fetching data failed:", error);
+    }
+  };
   return (
     //creates movie card element
     <>
-      <div>
-        <input
-          type="text"
-          onChange={(e) => updateSearchText(e.target.value)}
-          value={searchText}
-        />
-        <button onClick={searchMovies}>Search</button>
-
-        <select name="sort" id="">
-          <option disabled selected value="">
-            Sort by
-          </option>
-          <option value="popular">Popular</option>
-          <option value="top-rated">Top rated</option>
-          <option value="upcoming">Upcoming</option>
-        </select>
-      </div>
+      <Nav
+        setShowSearch={setShowSearch}
+        setData={setData}
+        updateSearchText={setSearchText}
+        sortBy={setSortString}
+        updatePage={setPage}
+        updateLastAction={setLastAction}
+        fetchData={fetchData}
+        showSearch={showSearch}
+        searchText={searchText}
+        performSearch={performSearch}
+        applySort={applySort}
+        updateGenreFilter={setGenreFilter}
+      />
       <div className="movie-row">
         {data.length > 0 ? (
-          data.map((movie) => (
-            <MovieCard
-              key={movie.id}
-              title={movie.title}
-              poster={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
-              rating={Math.round(movie.vote_average * 100) / 100} //get two decimal points
-              clickHandler={() => toggleModal(movie.id)}
-            />
-          ))
+          data.map(
+            (
+              movie // no shadow til hover
+            ) => (
+              <MovieCard // blur shadow for effect
+                key={movie.id} //styling ligh dark purple and green
+                title={movie.title}
+                poster={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
+                rating={Math.round(movie.vote_average * 100) / 100} //get two decimal points
+                clickHandler={() => toggleModal(movie.id)}
+              />
+            )
+          )
         ) : (
           <p>No movies found...</p> //error handle if data length == 0
+          //hide show more
         )}
-        <button className="load-btn" onClick={changePage}>
-          Show More
-        </button>
+        {data.length > 0 && (
+          <button className="load-btn" onClick={changePage}>
+            Show More
+          </button>
+        )}
       </div>
-      {modalOpen && selectedMovieInfo && (
+      {showModal && MovieInfo && (
         <Modal
-          isOpen={modalOpen}
+          isOpen={showModal}
           onClose={() => setShowModal(false)}
-          title={selectedMovieInfo.name}
-          poster={`https://image.tmdb.org/t/p/original${selectedMovieInfo.poster_path}`}
-          release={selectedMovieInfo.release_date}
-          overview={selectedMovieInfo.overview}
-          genres={genre_convert(
-            selectedMovieInfo.genres.map((genre) => genre.id)
-          )}
+          title={MovieInfo.name}
+          poster={`https://image.tmdb.org/t/p/original${MovieInfo.poster_path}`}
+          release={MovieInfo.release_date}
+          overview={MovieInfo.overview}
+          genres={genre_convert(MovieInfo.genres.map((genre) => genre.id))}
         />
       )}
     </>
