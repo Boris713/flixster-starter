@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import "./Nav.css";
 
+//Purpose: create nav bar to sort,search,filter info
 const Nav = ({
   setShowSearch,
   setData,
@@ -15,12 +16,14 @@ const Nav = ({
   applySort,
   updateGenreFilter,
 }) => {
-  const [action, setAction] = useState("now_showing");
+  const [action, setAction] = useState("now_showing"); // update last used action
+
   const handleSortChange = (newSortString) => {
     applySort(newSortString);
   };
 
   const handleGenreChange = (newGenre) => {
+    setData([]);
     updateGenreFilter(newGenre);
   };
 
@@ -93,7 +96,9 @@ const Nav = ({
             name="filter"
             id="filter-menu"
             className="sort-menu"
-            onChange={(e) => handleGenreChange(e.target.value)}
+            onChange={(e) => {
+              handleGenreChange(e.target.value);
+            }}
           >
             <option value="">All Genres</option>
             <option value="28">Action</option>

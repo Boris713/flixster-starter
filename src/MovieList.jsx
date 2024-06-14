@@ -15,6 +15,8 @@ export const MovieList = () => {
   const [lastAction, setLastAction] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [genre, setGenreFilter] = useState("");
+  const [seenMovies, setSeenMovies] = useState([]);
+  const [lovedMovies, setLovedMovies] = useState([]);
 
   const options = {
     method: "GET",
@@ -22,6 +24,22 @@ export const MovieList = () => {
       accept: "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_TOKEN}`, //private token used to access api
     },
+  };
+
+  const toggleSeen = (movieId) => {
+    setSeenMovies((prev) =>
+      prev.includes(movieId)
+        ? prev.filter((id) => id !== movieId)
+        : [...prev, movieId]
+    );
+  };
+
+  const toggleLoved = (movieId) => {
+    setLovedMovies((prev) =>
+      prev.includes(movieId)
+        ? prev.filter((id) => id !== movieId)
+        : [...prev, movieId]
+    );
   };
 
   const applySort = (newSortString) => {
@@ -36,8 +54,11 @@ export const MovieList = () => {
       return;
     }
     setLastAction("search");
-    setPage(1); // Reset to the first page
-    fetchData(); // Manually trigger data fetching
+    setSortString("");
+    setGenreFilter("");
+    setPage(1);
+    setData([]);
+    fetchData();
   };
 
   const changePage = () => {
@@ -91,7 +112,11 @@ export const MovieList = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setData(page === 1 ? [...data.results] : [...data, ...data.results]); // Handle pagination
+      if (page === 1) {
+        setData(data.results);
+      } else {
+        setData((prevData) => [...prevData, ...data.results]); // Append new data to existing data
+      }
     } catch (error) {
       console.error("Fetching data failed:", error);
     }
@@ -115,22 +140,21 @@ export const MovieList = () => {
       />
       <div className="movie-row">
         {data.length > 0 ? (
-          data.map(
-            (
-              movie // no shadow til hover
-            ) => (
-              <MovieCard // blur shadow for effect
-                key={movie.id} //styling ligh dark purple and green
-                title={movie.title}
-                poster={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
-                rating={Math.round(movie.vote_average * 100) / 100} //get two decimal points
-                clickHandler={() => toggleModal(movie.id)}
-              />
-            )
-          )
+          data.map((movie) => (
+            <MovieCard
+              key={movie.id}
+              title={movie.title}
+              poster={`https://image.tmdb.org/t/p/original${movie.poster_path}`}
+              rating={Math.round(movie.vote_average * 100) / 100}
+              clickHandler={() => toggleModal(movie.id)}
+              seen={seenMovies.includes(movie.id)}
+              loved={lovedMovies.includes(movie.id)}
+              toggleSeen={() => toggleSeen(movie.id)}
+              toggleLoved={() => toggleLoved(movie.id)}
+            />
+          ))
         ) : (
           <p>No movies found...</p> //error handle if data length == 0
-          //hide show more
         )}
         {data.length > 0 && (
           <button className="load-btn" onClick={changePage}>
